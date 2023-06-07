@@ -1,0 +1,278 @@
+C51 COMPILER V9.57.0.0   MAIN                                                              05/25/2023 11:06:50 PAGE 1   
+
+
+C51 COMPILER V9.57.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\OUT\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE USE\main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\LIST\main
+                    -.lst) TABS(2) OBJECT(.\OUT\main.obj)
+
+line level    source
+
+   1          #include "main.h"
+   2          #include "delay.h"
+   3          #include "lcd1602.h"
+   4          #include "MPU6050.h"
+   5          
+   6          #define RUN_CNT_MAX         40
+   7          #define MENU_NUM_LIMIT      2
+   8          
+   9          #include <reg52.h>
+  10          
+  11          //Pin P1, you can replace
+  12          sbit KEY1=P3^1;
+  13          sbit KEY2=P3^0;
+  14            #define KEY1_PRESS  0
+  15            #define KEY2_PRESS  1
+  16            #define KEY_UNPRESS 2
+  17          
+  18            #define N 0.005
+  19          /********************* 变量定义 *******************/
+  20          uchar menu = 2;//now only angle dat
+  21          int Mpu_Xdat;
+  22          int Mpu_Ydat;
+  23          int Mpu_Zdat;
+  24          
+  25          bit Flag_X_Nega;//0---正数  1---负数
+  26          bit Flag_Y_Nega;//0---正数  1---负数
+  27          bit Flag_Z_Nega;//0---正数  1---负数
+  28          
+  29          /********************* 函数声明 *******************/
+  30          //显示界面  每个菜单的结构
+  31          void Dis_menu();
+  32          //显示 数据
+  33          void Dis_Dat();
+  34          //获取数据
+  35          void Get_Dat();
+  36          //按键扫描
+  37          void Key_Scan();
+  38          
+  39          
+  40          void delay_ms(unsigned int n)
+  41          {
+  42   1       unsigned int i = n*100;
+  43   1       while (i--);
+  44   1      }
+  45          
+  46          
+  47          void TurnMotor(unsigned long angle,unsigned int A)
+  48          {
+  49   1       unsigned char tmp; 
+  50   1       unsigned char index = 0; 
+  51   1       unsigned long beats = 0; 
+  52   1       unsigned char code BeatCode[2][8] = { 
+  53   1       0xE, 0xC, 0xD, 0x9, 0xB, 0x3, 0x7, 0x6,
+  54   1       0x6 ,0x7, 0x3, 0xB, 0x9, 0xD, 0xC, 0xE
+C51 COMPILER V9.57.0.0   MAIN                                                              05/25/2023 11:06:50 PAGE 2   
+
+  55   1       };
+  56   1       
+  57   1       beats = (angle*4096) / 360; 
+  58   1       while (beats--) 
+  59   1       {
+  60   2       tmp = P1; 
+  61   2       tmp = tmp & 0x0f;
+  62   2       tmp = tmp | (BeatCode[A][index]<<4); 
+  63   2       P1 = tmp; 
+  64   2       index++; 
+  65   2       index = index & 0x07;
+  66   2       delay_ms(1); 
+  67   2       }
+  68   1       P1 = P1 | 0xf0; 
+  69   1      }
+  70          
+  71          
+  72          unsigned int key_scan()
+  73          { 
+  74   1        if(KEY1==0||KEY2==0)//??????????
+  75   1        {
+  76   2          delay_ms(5);//????
+  77   2          if(KEY1==0)
+  78   2            return KEY1_PRESS;
+  79   2          else if(KEY2==0)
+  80   2            return KEY2_PRESS;
+  81   2        }
+  82   1        return KEY_UNPRESS;   
+  83   1      }
+  84          
+  85          
+  86          
+  87          
+  88          void main()
+  89          {
+  90   1        int flagb = 2;
+  91   1        int sum=0;
+  92   1        unsigned int A=2;
+  93   1        DelayMs(100);//等待系统稳定
+  94   1        LCD_Init();
+  95   1        Dis_menu();
+  96   1        InitMPU6050();
+  97   1        while(1)
+  98   1        {
+  99   2          //B:
+ 100   2          Get_Dat();
+ 101   2          DelayMs(5);
+ 102   2      //    A=key_scan();
+ 103   2      //    if(A==0||A==1)
+ 104   2      //    {
+ 105   2      //      TurnMotor(360*N,A);
+ 106   2      //      
+ 107   2      //    }
+ 108   2      //    
+ 109   2      //    A=2;
+ 110   2          sum++;
+ 111   2          if(Mpu_Ydat < -20&&sum>3)
+ 112   2          {
+ 113   3            TurnMotor(360*N,0);
+ 114   3            sum=0;
+ 115   3          }
+ 116   2          else if(Mpu_Ydat > 20&&sum>3)
+C51 COMPILER V9.57.0.0   MAIN                                                              05/25/2023 11:06:50 PAGE 3   
+
+ 117   2          {
+ 118   3            TurnMotor(360*N,1);
+ 119   3            sum=0;
+ 120   3          }
+ 121   2        
+ 122   2        
+ 123   2          //Key_Scan();
+ 124   2        }
+ 125   1      }
+ 126          
+ 127          /*
+ 128          void Key_Scan()
+ 129          {
+ 130            //切换菜单页面
+ 131            if(!key1)
+ 132            {
+ 133              DelayMs(2);
+ 134              if(!key1)
+ 135              {
+ 136                menu++;
+ 137                if(menu > MENU_NUM_LIMIT)
+ 138                {
+ 139                  menu = 0;
+ 140                }
+ 141                //刷新菜单显示结构
+ 142                Dis_menu();
+ 143                while(!key1);
+ 144              }
+ 145            }
+ 146          }
+ 147          */
+ 148          //获取数据
+ 149          void Get_Dat()
+ 150          {
+ 151   1        static uint Run_Get_Cnt = RUN_CNT_MAX;
+ 152   1        if(Run_Get_Cnt++ > RUN_CNT_MAX)//设置获取显示间隔
+ 153   1        {
+ 154   2          Run_Get_Cnt = 0;
+ 155   2          //根据menu获取对应数据   因为Menu 刚好是 0 1 2 对应了宏定义
+ 156   2          Get_Mpu6050_Data(&Mpu_Xdat,&Mpu_Ydat,&Mpu_Zdat,menu);
+ 157   2          
+ 158   2          //判断正负  如果是负数则Flag_X_Nega置1 并将数据转换为正数
+ 159   2      //    if(Mpu_Xdat < 0)
+ 160   2      //    {
+ 161   2      //      //Mpu_Xdat*=-1; //Mpu_Xdat = Mpu_Xdat * -1;
+ 162   2      //      Flag_X_Nega = 1;
+ 163   2      //    }
+ 164   2      //    else
+ 165   2      //    {
+ 166   2      //      Flag_X_Nega = 0;
+ 167   2      //    }
+ 168   2      //    //判断正负  如果是负数则Flag_X_Nega置1 并将数据转换为正数
+ 169   2      //    if(Mpu_Ydat < 0)
+ 170   2      //    {
+ 171   2      //      //Mpu_Ydat*=-1;
+ 172   2      //      Flag_Y_Nega = 1;
+ 173   2      //    }
+ 174   2      //    else
+ 175   2      //    {
+ 176   2      //      Flag_Y_Nega = 0;
+ 177   2      //    }
+ 178   2      //    //判断正负  如果是负数则Flag_X_Nega置1 并将数据转换为正数
+C51 COMPILER V9.57.0.0   MAIN                                                              05/25/2023 11:06:50 PAGE 4   
+
+ 179   2      //    if(Mpu_Zdat < 0)
+ 180   2      //    {
+ 181   2      //      //Mpu_Zdat*=-1;
+ 182   2      //      Flag_Z_Nega = 1;
+ 183   2      //    }
+ 184   2      //    else
+ 185   2      //    {
+ 186   2      //      Flag_Z_Nega = 0;
+ 187   2      //    }
+ 188   2          //获取完数据 就将数据显示出来
+ 189   2          Dis_Dat();
+ 190   2        }
+ 191   1      }
+ 192          
+ 193          //显示 数据
+ 194          void Dis_Dat()
+ 195          {
+ 196   1        //只有在这三个菜单才显示对应数据
+ 197   1        if(menu == 0 || menu == 1 || menu == 2)
+ 198   1        {
+ 199   2      //    //判断正负标志位  对应显示负号
+ 200   2      //    if(Flag_X_Nega)
+ 201   2      //      LCD_Write_Char(9,0,'-');
+ 202   2      //    else
+ 203   2      //      LCD_Write_Char(9,0,' ');
+ 204   2          //在该坐标显示5位的 数据 
+ 205   2          LCD_Write_Number(10,0,Mpu_Xdat,5);
+ 206   2          
+ 207   2      //    //判断正负标志位  对应显示负号
+ 208   2      //    if(Flag_Y_Nega)
+ 209   2      //      LCD_Write_Char(1,1,'-');
+ 210   2      //    else
+ 211   2      //      LCD_Write_Char(1,1,' ');
+ 212   2          //在该坐标显示5位的 数据 
+ 213   2          LCD_Write_Number(2,1,Mpu_Ydat,5);
+ 214   2          
+ 215   2      //    //判断正负标志位  对应显示负号
+ 216   2      //    if(Flag_Z_Nega)
+ 217   2      //      LCD_Write_Char(9,1,'-');
+ 218   2      //    else
+ 219   2      //      LCD_Write_Char(9,1,' ');
+ 220   2          //在该坐标显示5位的 数据 
+ 221   2          LCD_Write_Number(10,1,Mpu_Zdat,5);
+ 222   2        }
+ 223   1      }
+ 224          
+ 225          //显示界面  每个菜单的结构
+ 226          void Dis_menu()
+ 227          {
+ 228   1        LCD_Clear();
+ 229   1        if(menu == 0)
+ 230   1        {
+ 231   2          LCD_Write_String(0,0,"ACCEL   X      ");
+ 232   2          LCD_Write_String(0,1,"Y       Z      ");
+ 233   2        }
+ 234   1        else if(menu == 1)
+ 235   1        {
+ 236   2          LCD_Write_String(0,0,"GYRO    X      ");
+ 237   2          LCD_Write_String(0,1,"Y       Z      ");
+ 238   2        }
+ 239   1        else if(menu == 2)
+ 240   1        {
+C51 COMPILER V9.57.0.0   MAIN                                                              05/25/2023 11:06:50 PAGE 5   
+
+ 241   2          LCD_Write_String(0,0,"ANGLE   X:     ");
+ 242   2          LCD_Write_String(0,1,"Y:      Z:     ");
+ 243   2        }
+ 244   1        Dis_Dat();
+ 245   1      }
+ 246          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    504    ----
+   CONSTANT SIZE    =     96    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      9      17
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

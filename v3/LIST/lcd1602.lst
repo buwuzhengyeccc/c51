@@ -1,0 +1,266 @@
+C51 COMPILER V9.57.0.0   LCD1602                                                           05/25/2023 11:06:50 PAGE 1   
+
+
+C51 COMPILER V9.57.0.0, COMPILATION OF MODULE LCD1602
+OBJECT MODULE PLACED IN .\OUT\lcd1602.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE USE\lcd1602.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\LIST\l
+                    -cd1602.lst) TABS(2) OBJECT(.\OUT\lcd1602.obj)
+
+line level    source
+
+   1          #include "lcd1602.h"
+   2          #include "delay.h"
+   3          #include <intrins.h>
+   4          //#include <math.h>
+   5          #define uchar unsigned char
+   6          #define uint unsigned int
+   7          
+   8          #define _NOP() _nop_()
+   9          #define DEBUG_LCD
+  10          
+  11          #ifndef DEBUG_LCD
+              sbit RS = P2^5;   //定义端口 
+              sbit RW = P2^6;
+              sbit EN = P2^7;
+              #else
+  16          sbit RS = P2^6;   //定义端口 
+  17          sbit RW = P2^5;
+  18          sbit EN = P2^7;
+  19          #endif
+  20          
+  21          
+  22          #define DataPort    P0        
+  23          #define DataPIN     P0
+  24          
+  25          #define CLR_RS (RS=0) 
+  26          #define SET_RS (RS=1) 
+  27          #define CLR_RW (RW=0) 
+  28          #define SET_RW (RW=1)
+  29          #define CLR_EN (EN=0)
+  30          #define SET_EN (EN=1) 
+  31          
+  32          
+  33          /*
+  34          
+  35          功    能：让液晶从某个位置起连续显示一个数值
+  36          参    数：x--位置的列坐标
+  37                    y--位置的行坐标
+  38                    Dis_dat--需要显示的数
+  39                    Dis_Len--需要显示的宽度
+  40          */
+  41          
+  42          void DispNum(uchar x, uchar y, uint Dis_dat, uchar Dis_Len)
+  43          {
+  44   1        uchar i;
+  45   1        uint dat = 1;
+  46   1        Disp1Char(x+Dis_Len-1,y,Dis_dat%10+0x30);
+  47   1        if(Dis_Len == 1)
+  48   1          return;
+  49   1        for(i = 1;i < Dis_Len;i++)
+  50   1          dat*=10;
+  51   1        for(i = 1; i < Dis_Len ; i++)
+  52   1        {
+  53   2          //dat = pow(10, Dis_Len-i);
+  54   2          if(Dis_dat >= dat)
+C51 COMPILER V9.57.0.0   LCD1602                                                           05/25/2023 11:06:50 PAGE 2   
+
+  55   2            Disp1Char(x+i-1,y,Dis_dat/dat%10+0x30);
+  56   2          else
+  57   2            Disp1Char(x+i-1,y,' ');
+  58   2          dat/=10;
+  59   2        }
+  60   1      }
+  61          
+  62          
+  63          /*
+  64          功    能：让液晶从某个位置起连续显示一个字符串
+  65          参    数：x--位置的列坐标
+  66                    y--位置的行坐标
+  67                    ptr--指向字符串存放位置的指针
+  68          */
+  69          void DispStr(uchar x,uchar y,uchar *ptr) 
+  70          {
+  71   1          uchar *temp;
+  72   1          uchar i,n = 0;
+  73   1          
+  74   1          temp = ptr;
+  75   1          while(*ptr++ != '\0')   n++;    //计算字符串有效字符的个数
+  76   1          
+  77   1          for (i=0;i<n;i++)
+  78   1          {
+  79   2              Disp1Char(x++,y,temp[i]);
+  80   2              if (x == 0x10)
+  81   2              {
+  82   3                  break;
+  83   3              }
+  84   2          }
+  85   1      }
+  86          
+  87          /*
+  88          功    能：让液晶从某个位置起连续显示N个字符
+  89          参    数：x--位置的列坐标
+  90                    y--位置的行坐标
+  91                    n--字符个数
+  92                    ptr--指向字符存放位置的指针
+  93          *******************************************
+  94          void DispNChar(uchar x,uchar y, uchar n,uchar *ptr) 
+  95          {
+  96              uchar i;
+  97              
+  98              for (i=0;i<n;i++)
+  99              {
+ 100                  Disp1Char(x++,y,ptr[i]);
+ 101                  if (x == 0x10)
+ 102                  {
+ 103                     x = 0; 
+ 104                      y ^= 1;
+ 105                  }
+ 106              }
+ 107          }
+ 108          */
+ 109          /*****
+ 110          函数名称：LocateXY
+ 111          功    能：向液晶输入显示字符位置的坐标信息
+ 112          参    数：x--位置的列坐标
+ 113                    y--位置的行坐标
+ 114          ********************************************/
+ 115          void LocateXY(uchar x,uchar y) 
+ 116          {
+C51 COMPILER V9.57.0.0   LCD1602                                                           05/25/2023 11:06:50 PAGE 3   
+
+ 117   1          uchar temp;
+ 118   1      
+ 119   1          temp = x&0x0f;
+ 120   1          y &= 0x01;
+ 121   1          if(y)   temp |= 0x40;  //如果在第2行
+ 122   1          temp |= 0x80;
+ 123   1      
+ 124   1          LcdWriteCommand(temp,1);
+ 125   1      }
+ 126          
+ 127          /**
+ 128          功    能：在某个位置显示一个字符
+ 129          参    数：x--位置的列坐标
+ 130                    y--位置的行坐标
+ 131                    data--显示的字符数据
+ 132          ********************************************/
+ 133          void Disp1Char(uchar x,uchar y,uchar data1) 
+ 134          {
+ 135   1          LocateXY( x, y );     
+ 136   1          LcdWriteData( data1 );    
+ 137   1      }
+ 138          
+ 139          /***
+ 140          功    能：对1602液晶模块进行复位操作
+ 141          **********/
+ 142          void LcdReset(void) 
+ 143          {
+ 144   1      //    DataDir  = 0xFF;                 //数据端口设为输出状态 
+ 145   1          LcdWriteCommand(0x38, 0);     //规定的复位操作
+ 146   1          DelayMs(5);
+ 147   1          LcdWriteCommand(0x38, 0);   
+ 148   1          DelayMs(5);
+ 149   1          LcdWriteCommand(0x38, 0);
+ 150   1          DelayMs(5);
+ 151   1      
+ 152   1          LcdWriteCommand(0x38, 1);   //显示模式设置
+ 153   1          LcdWriteCommand(0x08, 1);   //显示关闭
+ 154   1          LcdWriteCommand(0x01, 1);     //显示清屏
+ 155   1          LcdWriteCommand(0x06, 1);   //写字符时整体不移动
+ 156   1          LcdWriteCommand(0x0c, 1);   //显示开，不开游标，不闪烁
+ 157   1      }
+ 158          
+ 159          /*------------------------------------------------
+ 160                          清屏函数
+ 161          ------------------------------------------------*/
+ 162          void LcdClear(void) 
+ 163          { 
+ 164   1        LcdWriteCommand(0x01,1); 
+ 165   1        DelayMs(5);
+ 166   1      }
+ 167          
+ 168          /***
+ 169          功    能：向液晶模块写入命令
+ 170          参    数：cmd--命令，
+ 171                    chk--是否判忙的标志，1：判忙，0：不判
+ 172          *************/
+ 173          void LcdWriteCommand(uchar cmd,uchar chk) 
+ 174          {
+ 175   1      
+ 176   1          if (chk) WaitForEnable();   // 检测忙信号?
+ 177   1          
+ 178   1          CLR_RS; 
+C51 COMPILER V9.57.0.0   LCD1602                                                           05/25/2023 11:06:50 PAGE 4   
+
+ 179   1          CLR_RW; 
+ 180   1          _NOP();
+ 181   1      
+ 182   1          DataPort = cmd;             //将命令字写入数据端口 
+ 183   1          _NOP();         
+ 184   1          
+ 185   1          SET_EN;                     //产生使能脉冲信号
+ 186   1          _NOP();
+ 187   1          _NOP();
+ 188   1          CLR_EN;     
+ 189   1      }
+ 190          
+ 191          /**
+ 192          功    能：向液晶显示的当前地址写入显示数据
+ 193          参    数：data--显示字符数据
+ 194          *******/
+ 195          void LcdWriteData( uchar data1 ) 
+ 196          {
+ 197   1          WaitForEnable();        //等待液晶不忙
+ 198   1          SET_RS;
+ 199   1          CLR_RW; 
+ 200   1      
+ 201   1          SET_EN;
+ 202   1        
+ 203   1        _NOP();
+ 204   1          DataPort = data1;        //将显示数据写入数据端口
+ 205   1          _NOP();
+ 206   1                      //产生使能脉冲信号
+ 207   1          _NOP(); 
+ 208   1          _NOP(); 
+ 209   1          CLR_EN;   
+ 210   1      }
+ 211          
+ 212          /***
+ 213          功    能：等待1602液晶完成内部操作
+ 214          ****/
+ 215          void WaitForEnable(void) 
+ 216          {
+ 217   1          unsigned int later=0;
+ 218   1        DataPort=0xff;
+ 219   1          CLR_RS;
+ 220   1          SET_RW;
+ 221   1          _NOP();
+ 222   1          SET_EN; 
+ 223   1          _NOP();
+ 224   1          _NOP();
+ 225   1      //    while((DataPIN&Busy)!=0);    
+ 226   1          while(((DataPIN&0x80)!=0)&&(later<1000))  //检测忙标志
+ 227   1          {
+ 228   2            DelayUs2x(2);
+ 229   2            later++;        
+ 230   2          }
+ 231   1          CLR_EN;
+ 232   1      //    DataDir|=0xFF;  //将P4口切换为输出状态
+ 233   1      }   
+ 234          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    461    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+C51 COMPILER V9.57.0.0   LCD1602                                                           05/25/2023 11:06:50 PAGE 5   
+
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      23
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

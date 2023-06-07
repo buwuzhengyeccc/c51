@@ -1,0 +1,7 @@
+".\OUT\STARTUP.obj",
+".\OUT\main.obj",
+".\OUT\delay.obj",
+".\OUT\lcd1602.obj",
+".\OUT\MPU6050.obj" 
+TO ".\OUT\main" 
+PRINT(".\LIST\main.m51") RAMSIZE(256) 
